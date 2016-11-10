@@ -1,16 +1,19 @@
+import logging
+
+from django.contrib.auth import authenticate
 from django.contrib.auth import login
 from django.contrib.auth import logout
-from django.contrib.auth import authenticate
+from django.http import HttpResponseBadRequest
+from django.http import HttpResponseForbidden
 from django.http import HttpResponseRedirect
 from django.shortcuts import render_to_response
 from django.template import RequestContext
-from django.utils import translation
 
+from eveonline.EvESSO import EvESSO
 from forms import LoginForm
 
-import logging
-
 logger = logging.getLogger(__name__)
+
 
 def login_user(request):
     logger.debug("login_user called by user %s" % request.user)
@@ -46,7 +49,7 @@ def logout_user(request):
     logger.info("Successful logout for user %s" % logoutUser)
     return HttpResponseRedirect("/")
 
-    
+
 def redirect_to_sso(request):
     eve_sso = EvESSO(request)
     eve_sso_redirect_uri = eve_sso.generate_redirect_uri(eve_sso.generate_state())
@@ -71,14 +74,18 @@ def login_sso(request):
     if 'CharacterID' not in char_info:
         return HttpResponseBadRequest('No valid Character info could be found.')
 
-    character_id = char_info['CharacterID']
+    character_id = unicode(char_info['CharacterID'])
     character_name = char_info['CharacterName']
 
-    if not User.objects.filter(username=character_id).exists():
-        user = User.objects.create_user(character_id, None, character_name)
-        user.save()
+    user = authenticate(character_id=character_id, character_name=character_name)
+    if user is not None:
+        if user.is_active:
+            logger.info("Successful login attempt from user %s" % user)
+            login(request, user)
+            return HttpResponseRedirect("/dashboard/")
+        else:
+            logger.info("Login attempt failed for user %s: user marked inactive." % user)
+    else:
+        logger.info("Failed login attempt: provided character_id %s" % character_id)
 
-    user = authenticate(username=character_id, password=character_name)
-    login(request, user)
-
-    return HttpResponseRedirect('/dashboard')
+    return HttpResponseForbidden('There is currently no account with your character %s connected.' % character_name)
