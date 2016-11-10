@@ -14,6 +14,9 @@ from forms import LoginForm
 
 logger = logging.getLogger(__name__)
 
+NEXT_KEY = 'Next'
+DEFAULT_REDIRECT = '/dashboard/'
+
 
 def login_user(request):
     logger.debug("login_user called by user %s" % request.user)
@@ -53,6 +56,7 @@ def logout_user(request):
 def redirect_to_sso(request):
     eve_sso = EvESSO(request)
     eve_sso_redirect_uri = eve_sso.generate_redirect_uri(eve_sso.generate_state())
+    request.session[NEXT_KEY] = request.GET.get('next', DEFAULT_REDIRECT)
     if eve_sso_redirect_uri is not None:
         return HttpResponseRedirect(eve_sso_redirect_uri)
 
@@ -76,13 +80,14 @@ def login_sso(request):
 
     character_id = unicode(char_info['CharacterID'])
     character_name = char_info['CharacterName']
+    character_owner_hash = char_info['CharacterOwnerHash']
 
-    user = authenticate(character_id=character_id, character_name=character_name)
+    user = authenticate(character_id=character_id, character_name=character_name, character_owner_hash=character_owner_hash)
     if user is not None:
         if user.is_active:
             logger.info("Successful login attempt from user %s" % user)
             login(request, user)
-            return HttpResponseRedirect("/dashboard/")
+            return HttpResponseRedirect(request.session.get(NEXT_KEY, DEFAULT_REDIRECT))
         else:
             logger.info("Login attempt failed for user %s: user marked inactive." % user)
     else:
