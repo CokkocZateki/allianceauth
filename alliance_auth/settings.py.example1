@@ -160,7 +160,7 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-LOGIN_URL = 'auth_login_user'
+LOGIN_URL = '/sso/'
 
 SUPERUSER_STATE_BYPASS = 'True' == os.environ.get('AA_SUPERUSER_STATE_BYPASS', 'True')
 
